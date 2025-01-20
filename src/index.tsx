@@ -107,6 +107,7 @@ const AnimatedHeart: React.FC<AnimatedHeartProps> = ({ heart, onEnd }) => {
     opacity: opacity.value, // Bind opacity value
     transform: [{ translateY: translateY.value }], // Bind vertical translation
     position: 'absolute', // Absolute positioning
+    zIndex: 100000,
     left: x, // Initial X position
     top: y, // Initial Y position
   }));
