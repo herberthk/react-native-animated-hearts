@@ -3,7 +3,6 @@ import React, {
   useState,
   useImperativeHandle,
   forwardRef,
-  useRef,
 } from 'react';
 import { Dimensions, Image, Pressable, View } from 'react-native';
 import Animated, {
@@ -13,6 +12,7 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import throttle from 'lodash/throttle';
 
 // Get device dimensions
 const { width, height } = Dimensions.get('window');
@@ -30,7 +30,16 @@ type AnimatedHeartProps = {
   onEnd: (id: number) => void; // Callback triggered when the animation ends
 };
 
-type HeartAnimationProps = {};
+type HeartAnimationProps = {
+  /**
+   * Maximum number of reactions to be generated
+   */
+  maxItems?: number;
+  /**
+   * Minimum number of reactions to be generated
+   */
+  miniItems?: number;
+};
 
 export type HeartAnimationRef = {
   /**
@@ -41,35 +50,36 @@ export type HeartAnimationRef = {
 
 // Main HeartAnimation component
 const HeartAnimation = forwardRef<HeartAnimationRef, HeartAnimationProps>(
-  (_, ref) => {
+  ({ maxItems = 10, miniItems = 4 }, ref) => {
     const [hearts, setHearts] = useState<Heart[]>([]); // State to track active hearts
-    const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null); // To debounce tap gestures
 
-    // Handle tap gesture with debouncing
-    const handleTap = () => {
-      // Clear any previous debounce timeout
-      if (debounceTimeout.current) {
-        clearTimeout(debounceTimeout.current);
-      }
+    // Throttling to ensure handleTap is triggered only once every 300ms.
+    const handleTap = throttle(() => {
+      const count =
+        Math.floor(Math.random() * (maxItems - miniItems + 1)) + miniItems; // Random count
+      const newHearts: Heart[] = Array.from({ length: count }, () => ({
+        id: Date.now() + Math.random(), // Unique ID for each heart
+        size: Math.floor(Math.random() * (60 - 20 + 1)) + 20, // Random size between 20 and 60 pixels
+        x: Math.random() * width * 0.8 + width * 0.1, // Random X position
+        y: Math.random() * height * 0.5 + height * 0.2, // Random Y position
+      }));
 
-      // Set a new debounce timeout
-      debounceTimeout.current = setTimeout(() => {
-        const count = Math.floor(Math.random() * (30 - 4 + 1)) + 4; // Random count between 4 and 30
-        const newHearts: Heart[] = Array.from({ length: count }, () => ({
-          id: Date.now() + Math.random(), // Unique ID for each heart
-          size: Math.floor(Math.random() * (60 - 20 + 1)) + 20, // Random size between 20 and 60 pixels
-          x: Math.random() * width * 0.8 + width * 0.1, // Random X position within screen bounds
-          y: Math.random() * height * 0.5 + height * 0.2, // Random Y position within screen bounds
-        }));
-
-        // Add new hearts to the state
-        setHearts((prev) => [...prev, ...newHearts]);
-      }, 300); // 300ms debounce delay
-    };
+      // Batch updates to limit rendering
+      setHearts((prev) => {
+        const maxRenderedHearts = 30; // Limit the number of hearts rendered
+        const updatedHearts = [...prev, ...newHearts];
+        return updatedHearts.length > maxRenderedHearts
+          ? updatedHearts.slice(-maxRenderedHearts) // Keep the most recent hearts
+          : updatedHearts;
+      });
+    }, 300); // Throttle
 
     // Remove a heart after its animation ends
     const removeHeart = useCallback((id: number) => {
-      setHearts((prev) => prev.filter((heart) => heart.id !== id));
+      // Lazy Removal for Delayed state updates for heart removal using setTimeout
+      setTimeout(() => {
+        setHearts((prev) => prev.filter((heart) => heart.id !== id));
+      }, 1100); // Match animation duration (1000ms + buffer)
     }, []);
 
     // Expose the `triggerAnimation` method to parent components
@@ -107,9 +117,9 @@ const AnimatedHeart: React.FC<AnimatedHeartProps> = ({ heart, onEnd }) => {
     opacity: opacity.value, // Bind opacity value
     transform: [{ translateY: translateY.value }], // Bind vertical translation
     position: 'absolute', // Absolute positioning
-    zIndex: 100000,
     left: x, // Initial X position
     top: y, // Initial Y position
+    zIndex: 10000,
   }));
 
   // Handle animation lifecycle
