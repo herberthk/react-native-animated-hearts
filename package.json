@@ -1,6 +1,6 @@
 {
   "name": "@herberthtk/react-native-animated-hearts",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Smooth animated heart reactions component for react-native",
   "source": "./src/index.tsx",
   "main": "./lib/commonjs/index.js",
